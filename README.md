@@ -1,71 +1,99 @@
-# DHS Fit Dashboard
+<h1 align="center">
+  <br>
+  🛡️
+  <br>
+  DHS Fit Dashboard
+  <br>
+</h1>
 
-> DHS Account Intel / SpaceXAI opportunity fit-score dashboard
+<h4 align="center">Intelligence dashboard for tracking DHS opportunity signals and SpaceXAI fit scores.</h4>
 
-A Next.js TypeScript dashboard application for tracking Department of Homeland Security (DHS) opportunity signals and calculating fit scores against the SpaceXAI product catalog.
+<p align="center">
+  <a href="#key-features">Key Features</a> •
+  <a href="#how-to-use">How To Use</a> •
+  <a href="#credits">Credits</a> •
+  <a href="#license">License</a>
+</p>
 
-## Overview
+<p align="center">
+  <i>Screenshot: Dashboard view with signal tracking, catalog browser, and fit score analysis</i>
+</p>
 
-This dashboard provides:
+## Key Features
 
-- **Real-time opportunity tracking** - Monitor RFIs, RFPs, and other procurement signals from DHS agencies
-- **Automated fit scoring** - Calculate match scores between opportunity requirements and SpaceXAI capabilities
-- **Intelligence dashboard** - Visualize top matches, priority signals, and opportunity pipeline
-- **RESTful API** - Programmatic access to catalog, signals, and scoring engine
-- **Live stream endpoint** - Server-sent events for real-time updates
+* **Opportunity Signal Tracking**
+  - Monitor RFIs, RFPs, and procurement signals from DHS agencies
+  - Priority indicators and deadline tracking
+  - Automated processing pipeline
+* **Automated Fit Scoring**
+  - Multi-factor algorithm calculating match scores between opportunity requirements and SpaceXAI capabilities
+  - Requirement coverage analysis (40%), capability matches (30%), keyword overlap (20%)
+  - Priority boosts for critical/high-priority signals
+* **Catalog Management**
+  - Browse 8+ SpaceXAI products and services (Starlink, Starshield, Launch Services, etc.)
+  - Organized by category with full capability and tag listings
+  - Seeded demo data for immediate exploration
+* **Interactive Dashboard**
+  - Overview page with top 3 matches per signal
+  - Detailed signal pages with complete fit score breakdowns
+  - Match analysis with capability/keyword overlaps and requirement coverage visualization
+* **RESTful API**
+  - Programmatic access to catalog, signals, and scoring engine
+  - Create signals and auto-calculate scores
+  - Query endpoints for integration
+* **Real-time Stream**
+  - Server-sent events endpoint for live updates
+  - Event stream for signals and scores
+* **Seeded Demo Data**
+  - Pre-loaded ICE RFI signal for immediate testing
+  - 8 SpaceXAI catalog SKUs with realistic capabilities
+  - Pre-calculated fit scores ready to explore
 
-## Quick Start
+## How To Use
 
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-
-### Installation
+To clone and run this application, you'll need [Git](https://git-scm.com) and [Node.js](https://nodejs.org/en/download/) (which comes with [npm](http://npmjs.com)) installed on your computer. From your command line:
 
 ```bash
-npm install
-```
+# Clone this repository
+$ git clone https://github.com/lobster-shrimp/dhs-fit-dashboard-
 
-### Initialize Database
+# Go into the repository
+$ cd dhs-fit-dashboard-
 
-```bash
-npm run init-db
-```
+# Install dependencies
+$ npm install
 
-This creates the SQLite database with seed data including:
-- 8 SpaceXAI catalog SKUs (Starlink, Starshield, Launch Services, etc.)
-- 1 sample ICE RFI signal
-- Pre-calculated fit scores
+# Initialize the database with seed data
+$ npm run init-db
 
-### Development
-
-```bash
-npm run dev
+# Run the development server
+$ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
 
-## Features
+> **Note**
+> The database (data/intel.db) is created on first init-db run. Re-run `npm run init-db` to reset with fresh seed data.
 
-### Dashboard (`/`)
-- Overview of all opportunity signals
-- Priority indicators and deadlines
-- Top 3 fit matches per signal
-- Quick navigation to details
+### Additional Commands
 
-### Catalog (`/catalog`)
-- Browse all SpaceXAI products and services
-- Organized by category
-- Capabilities and tags for each SKU
+```bash
+# Build for production
+$ npm run build
 
-### Signal Details (`/signals/[id]`)
-- Full signal requirements and keywords
-- Complete fit score breakdown for all catalog SKUs
-- Match analysis with capability/keyword overlaps
-- Requirement coverage visualization
+# Run production server
+$ npm start
 
-### API Endpoints
+# Run tests
+$ npm test
+
+# Test scoring algorithm
+$ npm run test-scoring
+```
+
+## API Endpoints
+
+The dashboard exposes RESTful endpoints:
 
 - `GET /api/catalog` - List all catalog SKUs
 - `GET /api/signals` - List all signals
@@ -74,51 +102,30 @@ Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
 - `POST /api/score` - Calculate fit scores
 - `GET /api/stream` - Server-sent events stream
 
-## Technology Stack
+## Project Context
 
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Database**: SQLite with better-sqlite3
-- **Styling**: Tailwind CSS
-- **Testing**: Jest
+This is a **public mirror** of an internal intelligence tool. The live production tracker is maintained in a Google Sheet with real-time DHS opportunity data. This repository contains a runnable demo UI with:
 
-## Scripts
+- Fictional seed data for demonstration purposes
+- No secrets or API keys required
+- SQLite file-based database
+- Complete scoring algorithm implementation
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Run production server
-- `npm run lint` - Lint code
-- `npm test` - Run tests
-- `npm run init-db` - Initialize/reset database
-- `npm run test-scoring` - Test scoring algorithm
+## Credits
 
-## Scoring Algorithm
+This software uses the following open source packages:
 
-The fit score calculation considers:
-
-1. **Requirement Coverage** (40%) - How many signal requirements match SKU capabilities
-2. **Capability Matches** (30%) - Direct alignment between capabilities and signal needs  
-3. **Keyword Overlap** (20%) - Shared terminology and tags
-4. **Presence Bonus** (10%) - Any capability matches found
-5. **Priority Boost** - Critical/high priority signals receive additional weight
-6. **Category Bonus** - Keyword-category alignment
-
-Scores range from 0-100% with strength ratings:
-- **Excellent** (≥75%) - Strong alignment, high fit
-- **Strong** (55-74%) - Good match, worth pursuing
-- **Moderate** (35-54%) - Partial fit, needs review
-- **Weak** (<35%) - Limited alignment
-
-## Project Status
-
-This is a **public mirror** of an internal intelligence tool. The live production tracker is maintained in a Google Sheet with real-time DHS opportunity data.
+- [Next.js](https://nextjs.org/)
+- [React](https://reactjs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Jest](https://jestjs.io/)
 
 ## License
 
 MIT
 
-## Notes
+---
 
-- No secrets or API keys required for demo
-- Database is file-based (data/intel.db)
-- All seed data is fictional for demonstration purposes
+> GitHub [@lobster-shrimp](https://github.com/lobster-shrimp)
