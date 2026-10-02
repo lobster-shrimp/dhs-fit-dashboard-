@@ -1,49 +1,59 @@
-import type { Metadata } from 'next';
-import './globals.css';
-
-export const metadata: Metadata = {
-  title: 'DHS Fit Dashboard',
-  description: 'DHS Account Intel / SpaceXAI opportunity fit-score dashboard',
-};
-
+import { Inter } from "next/font/google";
+import Link from "next/link";
+const inter = Inter({ subsets: ["latin"] });
+  title: "DHS Account Intel + SpaceXAI Fit",
+  description: "Realtime DHS buying signals with SpaceXAI product fit scoring",
 export default function RootLayout({
   children,
-}: {
+}: Readonly<{
   children: React.ReactNode;
-}) {
-  return (
+}>) {
     <html lang="en">
-      <body className="antialiased bg-gray-50">
-        <header className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">DHS</span>
+      <body className={inter.className}>
+        <div className="min-h-screen flex flex-col">
+          <header className="border-b bg-white sticky top-0 z-50">
+            <div className="container mx-auto px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-8">
+                  <Link href="/" className="text-xl font-bold text-blue-600">
+                    DHS Account Intel
+                  </Link>
+                  <nav className="flex gap-6">
+                    <Link 
+                      href="/" 
+                      className="text-sm font-medium hover:text-blue-600 transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                    <Link 
+                      href="/catalog" 
+                      className="text-sm font-medium hover:text-blue-600 transition-colors"
+                    >
+                      Catalog
+                    </Link>
+                  </nav>
                 </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900">DHS Fit Dashboard</h1>
-                  <p className="text-xs text-gray-500">SpaceXAI Opportunity Intelligence</p>
+                <div className="flex items-center gap-4">
+                  <div className="text-xs text-gray-500">
+                    <span className="inline-flex items-center gap-1">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                      Live
+                    </span>
+                  </div>
                 </div>
               </div>
-              <nav className="flex space-x-4">
-                <a href="/" className="text-sm font-medium text-gray-700 hover:text-gray-900">
-                  Dashboard
-                </a>
-                <a href="/catalog" className="text-sm font-medium text-gray-700 hover:text-gray-900">
-                  Catalog
-                </a>
-              </nav>
             </div>
-          </div>
-        </header>
-        <main>{children}</main>
-        <footer className="mt-12 bg-white border-t border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-sm text-gray-500">
-            <p>Public mirror • Live tracker: Google Sheet</p>
-          </div>
-        </footer>
+          </header>
+          <main className="flex-1">
+            {children}
+          </main>
+          <footer className="border-t bg-gray-50 py-6">
+            <div className="container mx-auto px-4">
+              <div className="text-center text-sm text-gray-600">
+                <p>DHS Account Intel + SpaceXAI Fit Scoring</p>
+                <p className="text-xs mt-1">Semantic scoring powered by TF-IDF • Realtime updates via SSE</p>
+              </div>
+            </div>
+          </footer>
+        </div>
       </body>
-    </html>
-  );
-}

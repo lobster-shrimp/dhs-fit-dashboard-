@@ -1,43 +1,36 @@
 {
-  "name": "dhs-fit-dashboard",
-  "version": "1.0.0",
-  "description": "DHS Account Intel / SpaceXAI fit-score dashboard",
+  "name": "tmp-scaffold",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "jest",
-    "test:watch": "jest --watch",
     "init-db": "tsx scripts/init-db.ts",
-    "test-scoring": "tsx scripts/test-scoring.ts"
+    "dev": "npm run init-db && next dev --port 43567",
+    "build": "npm run init-db && next build",
+    "start": "next start --port 43567",
+    "test": "jest"
   },
   "dependencies": {
-    "next": "^14.2.0",
-    "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "better-sqlite3": "^11.0.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.3.0"
+    "@types/better-sqlite3": "^9.6.0",
+    "better-sqlite3": "^13.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.50.0",
+    "next": "16.3.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.10",
-    "@types/node": "^20.12.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "@types/jest": "^29.5.12",
-    "typescript": "^5.4.0",
-    "jest": "^29.7.0",
-    "ts-jest": "^29.1.2",
-    "tsx": "^4.7.0",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.3",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.2.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "@tailwindcss/postcss": "^4",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "jest": "^30.5.2",
+    "tailwindcss": "^4",
+    "ts-jest": "^29.4.14",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
   }
 }

@@ -1,211 +1,276 @@
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getSignal, getScoresForSignal, getCatalogSKU } from '@/lib/db';
-import { formatDate, priorityColor, scoreColor, strengthBadge, calculatePercentage } from '@/lib/utils';
+import { Signal, FitScore } from '@/lib/types';
+import { formatDate, formatDeadline, getStatusColor, getScoreBadgeColor, cn } from '@/lib/utils';
 
-export const dynamic = 'force-dynamic';
+export default function SignalDetail() {
+  const params = useParams();
+  const router = useRouter();
+  const [signal, setSignal] = useState<Signal | null>(null);
+  const [fitScores, setFitScores] = useState<FitScore[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [scoring, setScoring] = useState(false);
 
-interface PageProps {
-  params: {
-    id: string;
+  useEffect(() => {
+    if (params.id) {
+      fetchSignal();
+    }
+  }, [params.id]);
+
+  const fetchSignal = async () => {
+    try {
+      const response = await fetch(`/api/signals/${params.id}`);
+      const data = await response.json();
+      setSignal(data.signal);
+      setFitScores(data.fit_scores);
+    } catch (error) {
+      console.error('Error fetching signal:', error);
+    } finally {
+      setLoading(false);
+    }
   };
-}
 
-export default function SignalDetailPage({ params }: PageProps) {
-  const signal = getSignal(params.id);
+  const updateStatus = async (newStatus: string) => {
+    try {
+      await fetch(`/api/signals/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      fetchSignal();
+    } catch (error) {
+      console.error('Error updating status:', error);
+    }
+  };
 
-  if (!signal) {
-    notFound();
+  const rescore = async () => {
+    if (!signal?.full_text) return;
+    
+    setScoring(true);
+    try {
+      await fetch('/api/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          signal_id: params.id,
+          text: signal.full_text,
+        }),
+      });
+      fetchSignal();
+    } catch (error) {
+      console.error('Error rescoring:', error);
+    } finally {
+      setScoring(false);
+    }
+  };
+
+  const copyAlert = () => {
+    if (!signal) return;
+    
+    const alert = `🚨 DHS ALERT: ${signal.account}
+
+${signal.title}
+
+Due: ${signal.deadline ? formatDate(signal.deadline) + ' (' + formatDeadline(signal.deadline) + ')' : 'No deadline'}
+Type: ${signal.type}
+Status: ${signal.status.toUpperCase()}
+
+${signal.action ? `Action: ${signal.action}` : ''}
+
+Top Fit: ${signal.top_sku || 'Not scored'} (${signal.fit_score || 0}/100)
+
+Source: ${signal.source || 'N/A'}`;
+    
+    navigator.clipboard.writeText(alert);
+    alert('Alert copied to clipboard!');
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-gray-500">Loading signal...</div>
+        </div>
+      </div>
+    );
   }
 
-  const scores = getScoresForSignal(signal.id);
-  const scoredResults = scores
-    .map(score => ({
-      score,
-      sku: getCatalogSKU(score.sku_id),
-    }))
-    .filter(r => r.sku !== null);
+  if (!signal) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Signal not found</p>
+          <Link href="/" className="text-blue-600 hover:underline">
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const getAccountBadgeColor = (account: string) => {
+    const colors: Record<string, string> = {
+      'ICE': 'bg-blue-100 text-blue-800',
+      'CBP': 'bg-purple-100 text-purple-800',
+      'USCIS': 'bg-green-100 text-green-800',
+      'FEMA': 'bg-orange-100 text-orange-800',
+      'CISA': 'bg-red-100 text-red-800',
+      'DHS HQ': 'bg-gray-100 text-gray-800',
+    };
+    return colors[account] || 'bg-gray-100 text-gray-800';
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6">
-        <Link href="/" className="text-sm text-blue-600 hover:text-blue-700">
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-4">
+        <Link href="/" className="text-blue-600 hover:underline text-sm">
           ← Back to Dashboard
         </Link>
       </div>
 
-      <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-start justify-between mb-4">
-            <h1 className="text-3xl font-bold text-gray-900">{signal.title}</h1>
-            {signal.processed && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                Processed
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-4 text-sm">
-            <span className="text-gray-600">
-              <strong>Source:</strong> {signal.source}
-            </span>
-            <span className={`font-medium ${priorityColor(signal.priority)}`}>
-              <strong>Priority:</strong> {signal.priority.toUpperCase()}
-            </span>
-            <span className="text-gray-600">
-              <strong>Uploaded:</strong> {formatDate(signal.uploaded_at)}
-            </span>
-            {signal.deadline && (
-              <span className="text-gray-600">
-                <strong>Deadline:</strong> {formatDate(signal.deadline)}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Summary</h2>
-          <p className="text-gray-700 leading-relaxed">{signal.summary}</p>
-        </div>
-
-        <div className="p-6 bg-gray-50 border-t border-gray-200">
-          <div className="grid gap-6 md:grid-cols-2">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Requirements</h3>
-              <ul className="space-y-2">
-                {signal.requirements.map((req, idx) => (
-                  <li key={idx} className="flex items-start">
-                    <span className="text-blue-500 mr-2">•</span>
-                    <span className="text-sm text-gray-700">{req}</span>
-                  </li>
-                ))}
-              </ul>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white rounded-lg border p-6">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-center gap-2">
+                <span className={cn('px-3 py-1 rounded text-sm font-medium', getAccountBadgeColor(signal.account))}>
+                  {signal.account}
+                </span>
+                <span className={cn('px-3 py-1 rounded text-sm font-medium', getStatusColor(signal.status))}>
+                  {signal.status}
+                </span>
+              </div>
+              <button
+                onClick={copyAlert}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors"
+              >
+                Copy Alert
+              </button>
             </div>
 
-            <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Keywords</h3>
-              <div className="flex flex-wrap gap-2">
-                {signal.keywords.map((keyword, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700"
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">{signal.title}</h1>
+
+            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+              <div>
+                <span className="text-gray-500">Type:</span>
+                <span className="ml-2 font-medium">{signal.type}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Posted:</span>
+                <span className="ml-2 font-medium">{formatDate(signal.date)}</span>
+              </div>
+              {signal.deadline && (
+                <div>
+                  <span className="text-gray-500">Deadline:</span>
+                  <span className="ml-2 font-medium">{formatDate(signal.deadline)}</span>
+                  <span className="ml-2 text-orange-600">({formatDeadline(signal.deadline)})</span>
+                </div>
+              )}
+              {signal.source && (
+                <div className="col-span-2">
+                  <span className="text-gray-500">Source:</span>
+                  <a href={signal.source} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 hover:underline">
+                    {signal.source}
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {signal.action && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="text-sm font-medium text-blue-900 mb-1">Recommended Action</div>
+                <div className="text-sm text-blue-800">{signal.action}</div>
+              </div>
+            )}
+
+            <div className="flex gap-2 mb-6">
+              {['open', 'watch', 'responding', 'closed'].map((status) => (
+                <button
+                  key={status}
+                  onClick={() => updateStatus(status)}
+                  className={cn(
+                    'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+                    signal.status === status
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  )}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {signal.full_text && (
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-3">Full Text</h2>
+                <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 whitespace-pre-wrap max-h-96 overflow-y-auto">
+                  {signal.full_text}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-lg border p-6 sticky top-24">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">SpaceXAI Fit Scores</h2>
+              <button
+                onClick={rescore}
+                disabled={scoring || !signal.full_text}
+                className={cn(
+                  'px-3 py-1 rounded text-sm font-medium transition-colors',
+                  scoring || !signal.full_text
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                )}
+              >
+                {scoring ? 'Scoring...' : 'Rescore'}
+              </button>
+            </div>
+
+            {fitScores.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 mb-4">No scores yet</p>
+                {signal.full_text && (
+                  <button
+                    onClick={rescore}
+                    disabled={scoring}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    {keyword}
-                  </span>
+                    Score Now
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                {fitScores.map((score) => (
+                  <div key={score.id} className="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900 truncate">
+                          {score.product_name}
+                        </div>
+                        <div className="text-xs text-gray-500">{score.sku}</div>
+                      </div>
+                      <div className={cn('text-lg font-bold', getScoreBadgeColor(score.fit_score))}>
+                        {score.fit_score}
+                      </div>
+                    </div>
+                    {score.rationale && (
+                      <div className="text-xs text-gray-600 leading-relaxed">
+                        {score.rationale}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
-            </div>
+            )}
           </div>
         </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Fit Scores</h2>
-          <p className="text-sm text-gray-600 mt-1">
-            {scoredResults.length} catalog SKU(s) scored
-          </p>
-        </div>
-
-        {scoredResults.length > 0 ? (
-          <div className="divide-y divide-gray-200">
-            {scoredResults.map(({ score, sku }) => {
-              if (!sku) return null;
-
-              return (
-                <div key={sku.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-1">{sku.name}</h3>
-                      <p className="text-sm text-gray-500">{sku.category} • {sku.id}</p>
-                    </div>
-                    <div className="text-right ml-4">
-                      <div className={`text-3xl font-bold ${scoreColor(score.score)}`}>
-                        {Math.round(score.score * 100)}%
-                      </div>
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${strengthBadge(
-                          score.match_details.strength
-                        )} mt-1`}
-                      >
-                        {score.match_details.strength}
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="text-gray-600 mb-4">{sku.description}</p>
-
-                  <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                    <div className="text-sm font-medium text-gray-900 mb-2">Match Analysis</div>
-                    <p className="text-sm text-gray-700">{score.match_details.rationale}</p>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-3 text-sm">
-                    <div>
-                      <div className="font-medium text-gray-700 mb-2">
-                        Capability Matches ({score.match_details.capability_matches.length})
-                      </div>
-                      {score.match_details.capability_matches.length > 0 ? (
-                        <ul className="space-y-1">
-                          {score.match_details.capability_matches.map((cap, idx) => (
-                            <li key={idx} className="text-gray-600">
-                              ✓ {cap}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-gray-400 italic">None</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="font-medium text-gray-700 mb-2">
-                        Keyword Matches ({score.match_details.keyword_matches.length})
-                      </div>
-                      {score.match_details.keyword_matches.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {score.match_details.keyword_matches.map((kw, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-700"
-                            >
-                              {kw}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-gray-400 italic">None</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="font-medium text-gray-700 mb-2">Requirement Coverage</div>
-                      <div className="flex items-center">
-                        <div className="flex-1 bg-gray-200 rounded-full h-2 mr-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: calculatePercentage(score.match_details.requirement_coverage) }}
-                          />
-                        </div>
-                        <span className="text-gray-900 font-medium">
-                          {calculatePercentage(score.match_details.requirement_coverage)}
-                        </span>
-                      </div>
-                      <p className="text-gray-500 text-xs mt-1">
-                        {Math.round(score.match_details.requirement_coverage * signal.requirements.length)} of{' '}
-                        {signal.requirements.length} requirements
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="p-12 text-center">
-            <p className="text-gray-500">No fit scores calculated yet</p>
-          </div>
-        )}
       </div>
     </div>
   );

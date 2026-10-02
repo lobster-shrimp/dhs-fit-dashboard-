@@ -1,53 +1,48 @@
-export interface CatalogSKU {
-  id: string;
-  name: string;
-  category: string;
-  capabilities: string[];
-  tags: string[];
-  description: string;
+export interface Signal {
+  id: number;
+  date: string;
+  account: string;
+  type: string;
+  title: string;
+  deadline: string | null;
+  source: string | null;
+  action: string | null;
+  status: string;
+  top_sku: string | null;
+  fit_score: number | null;
+  fit_note: string | null;
+  full_text: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-export interface Signal {
-  id: string;
-  source: string;
-  title: string;
-  summary: string;
-  requirements: string[];
-  keywords: string[];
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  deadline?: string;
-  uploaded_at: string;
-  processed: boolean;
+export interface CatalogItem {
+  id: number;
+  sku: string;
+  family: string | null;
+  name: string;
+  channel: string | null;
+  keywords: string | null;
+  description: string;
+  source: string | null;
+  updated: string | null;
 }
 
 export interface FitScore {
-  signal_id: string;
-  sku_id: string;
-  score: number;
-  match_details: MatchDetails;
-  calculated_at: string;
+  id: number;
+  signal_id: number;
+  sku: string;
+  product_name: string;
+  fit_score: number;
+  rationale: string | null;
+  scored_at: string;
 }
 
-export interface MatchDetails {
-  capability_matches: string[];
-  keyword_matches: string[];
-  requirement_coverage: number;
-  strength: 'weak' | 'moderate' | 'strong' | 'excellent';
+export interface ScoredProduct {
+  sku: string;
+  product_name: string;
+  family: string | null;
+  fit_score: number;
   rationale: string;
-}
-
-export interface StreamEvent {
-  type: 'signal' | 'score' | 'heartbeat';
-  timestamp: string;
-  data: Signal | FitScore | { status: string };
-}
-
-export interface ScoringResult {
-  signal: Signal;
-  matches: Array<{
-    sku: CatalogSKU;
-    score: number;
-    details: MatchDetails;
-  }>;
+  matched_terms: string[];
 }

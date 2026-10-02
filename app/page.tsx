@@ -1,140 +1,182 @@
+'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getAllSignals, getScoresForSignal, getCatalogSKU } from '@/lib/db';
-import { formatDate, priorityColor, scoreColor, strengthBadge } from '@/lib/utils';
-
-export const dynamic = 'force-dynamic';
+import { Signal } from '@/lib/types';
+import { formatDeadline, formatDate, getStatusColor, getScoreBadgeColor, cn } from '@/lib/utils';
 
 export default function Dashboard() {
-  const signals = getAllSignals();
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('all');
+  const [lastUpdate, setLastUpdate] = useState<string>('');
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  useEffect(() => {
+    fetchSignals();
+    
+    const eventSource = new EventSource('/api/stream');
+    
+    eventSource.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'update') {
+        setLastUpdate(data.timestamp);
+        fetchSignals();
+      }
+    };
+    
+    eventSource.onerror = () => {
+      console.error('SSE connection error');
+    };
+    
+    return () => {
+      eventSource.close();
+    };
+  }, []);
+
+  const fetchSignals = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (filter !== 'all') {
+        params.append('status', filter);
+      }
+      
+      const response = await fetch(`/api/signals?${params}`);
+      const data = await response.json();
+      setSignals(data.signals);
+    } catch (error) {
+      console.error('Error fetching signals:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSignals();
+  }, [filter]);
+
+  const getAccountBadgeColor = (account: string) => {
+    const colors: Record<string, string> = {
+      'ICE': 'bg-blue-100 text-blue-800',
+      'CBP': 'bg-purple-100 text-purple-800',
+      'USCIS': 'bg-green-100 text-green-800',
+      'FEMA': 'bg-orange-100 text-orange-800',
+      'CISA': 'bg-red-100 text-red-800',
+      'DHS HQ': 'bg-gray-100 text-gray-800',
+    };
+    return colors[account] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getDeadlineUrgency = (deadline: string | null) => {
+    if (!deadline) return 'text-gray-500';
+    
+    const date = new Date(deadline);
+    const now = new Date();
+    const diff = date.getTime() - now.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    if (diff < 0) return 'text-red-600 font-semibold';
+    if (days <= 7) return 'text-orange-600 font-semibold';
+    if (days <= 14) return 'text-yellow-600';
+    return 'text-gray-700';
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg text-gray-500">Loading signals...</div>
+        </div>
+      </div>
+    );
+  }
+
+    <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h2>
-        <p className="text-gray-600">Monitor DHS opportunity signals and fit scores</p>
-      </div>
-
-      <div className="grid gap-6 mb-8 md:grid-cols-3">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500 mb-1">Total Signals</div>
-          <div className="text-3xl font-bold text-gray-900">{signals.length}</div>
-          <div className="text-xs text-gray-500 mt-1">Opportunity tracking</div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500 mb-1">High Priority</div>
-          <div className="text-3xl font-bold text-orange-600">
-            {signals.filter(s => s.priority === 'high' || s.priority === 'critical').length}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">Requires attention</div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-medium text-gray-500 mb-1">Processed</div>
-          <div className="text-3xl font-bold text-green-600">
-            {signals.filter(s => s.processed).length}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">Scored and analyzed</div>
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        {signals.map(signal => {
-          const scores = getScoresForSignal(signal.id);
-          const topScores = scores.slice(0, 3);
-
-          return (
-            <div key={signal.id} className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <Link
-                      href={`/signals/${signal.id}`}
-                      className="text-xl font-semibold text-gray-900 hover:text-blue-600"
-                    >
-                      {signal.title}
-                    </Link>
-                    <div className="flex items-center space-x-3 mt-2">
-                      <span className="text-sm text-gray-500">{signal.source}</span>
-                      <span className={`text-sm font-medium ${priorityColor(signal.priority)}`}>
-                        {signal.priority.toUpperCase()}
-                      </span>
-                      {signal.deadline && (
-                        <span className="text-sm text-gray-500">
-                          Due: {formatDate(signal.deadline)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {signal.processed && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Processed
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-gray-600 mb-4 line-clamp-2">{signal.summary}</p>
-
-                <div className="border-t border-gray-200 pt-4">
-                  <div className="text-sm font-medium text-gray-700 mb-3">Top Matches:</div>
-                  {topScores.length > 0 ? (
-                    <div className="space-y-2">
-                      {topScores.map(score => {
-                        const sku = getCatalogSKU(score.sku_id);
-                        if (!sku) return null;
-
-                        return (
-                          <div
-                            key={score.sku_id}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded"
-                          >
-                            <div className="flex-1">
-                              <div className="font-medium text-gray-900">{sku.name}</div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {score.match_details.rationale}
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-3 ml-4">
-                              <span
-                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${strengthBadge(
-                                  score.match_details.strength
-                                )}`}
-                              >
-                                {score.match_details.strength}
-                              </span>
-                              <span className={`text-lg font-bold ${scoreColor(score.score)}`}>
-                                {Math.round(score.score * 100)}%
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No scores calculated yet</p>
-                  )}
-                </div>
-
-                <div className="mt-4 flex justify-end">
-                  <Link
-                    href={`/signals/${signal.id}`}
-                    className="text-sm font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    View Details →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        {signals.length === 0 && (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-gray-500 text-lg">No signals found</p>
-            <p className="text-gray-400 text-sm mt-2">Run npm run init-db to seed the database</p>
-          </div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">DHS Buying Signals</h1>
+        <p className="text-gray-600">
+          Live intelligence on DHS component opportunities with SpaceXAI product fit scoring
+        </p>
+        {lastUpdate && (
+          <p className="text-xs text-gray-500 mt-1">
+            Last update: {new Date(lastUpdate).toLocaleTimeString()}
         )}
       </div>
-    </div>
-  );
-}
+
+      <div className="mb-6 flex gap-2">
+        {['all', 'open', 'watch', 'responding', 'closed'].map((status) => (
+          <button
+            key={status}
+            onClick={() => setFilter(status)}
+            className={cn(
+              'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
+              filter === status
+                ? 'bg-blue-600 text-white'
+                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+            )}
+            {status.charAt(0).toUpperCase() + status.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {signals.length === 0 ? (
+        <div className="bg-white rounded-lg border p-12 text-center">
+          <p className="text-gray-500">No signals found</p>
+      ) : (
+        <div className="space-y-4">
+          {signals.map((signal) => (
+            <Link
+              key={signal.id}
+              href={`/signals/${signal.id}`}
+              className="block bg-white rounded-lg border hover:shadow-lg transition-shadow p-6"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={cn('px-2 py-1 rounded text-xs font-medium', getAccountBadgeColor(signal.account))}>
+                      {signal.account}
+                    </span>
+                    <span className={cn('px-2 py-1 rounded text-xs font-medium', getStatusColor(signal.status))}>
+                      {signal.status}
+                    </span>
+                    <span className="text-xs text-gray-500">{signal.type}</span>
+                  </div>
+                  
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {signal.title}
+                  </h3>
+                  
+                  {signal.action && (
+                    <p className="text-sm text-gray-600 mb-2">
+                      <span className="font-medium">Action:</span> {signal.action}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span>Posted: {formatDate(signal.date)}</span>
+                    {signal.deadline && (
+                      <span className={getDeadlineUrgency(signal.deadline)}>
+                        Due: {formatDate(signal.deadline)} ({formatDeadline(signal.deadline)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex flex-col items-end gap-2">
+                  {signal.fit_score !== null && (
+                    <div className="text-right">
+                      <div className={cn('text-3xl font-bold', getScoreBadgeColor(signal.fit_score))}>
+                        {signal.fit_score}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">Fit Score</div>
+                      {signal.top_sku && (
+                        <div className="text-xs text-gray-600 mt-1 font-medium">
+                          {signal.top_sku}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}

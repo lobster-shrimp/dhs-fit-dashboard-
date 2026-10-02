@@ -1,63 +1,56 @@
-import { getAllSignals, getScoresForSignal } from '@/lib/db';
-import type { StreamEvent } from '@/lib/types';
+import { NextRequest } from 'next/server';
+import db from '@/lib/db';
 
-export const dynamic = 'force-dynamic';
+let lastCheck = Date.now();
+let lastSignalCount = 0;
+let lastUpdateTime = '';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const encoder = new TextEncoder();
-
+  
   const stream = new ReadableStream({
     async start(controller) {
-      const sendEvent = (event: StreamEvent) => {
-        const data = `data: ${JSON.stringify(event)}\n\n`;
-        controller.enqueue(encoder.encode(data));
-      };
-
-      sendEvent({
-        type: 'heartbeat',
-        timestamp: new Date().toISOString(),
-        data: { status: 'connected' },
-      });
-
-      const signals = getAllSignals();
-
-      for (const signal of signals) {
-        sendEvent({
-          type: 'signal',
-          timestamp: new Date().toISOString(),
-          data: signal,
-        });
-
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        const scores = getScoresForSignal(signal.id);
-        
-        for (const score of scores.slice(0, 3)) {
-          sendEvent({
-            type: 'score',
-            timestamp: new Date().toISOString(),
-            data: score,
-          });
+      const sendUpdate = () => {
+        try {
+          const signals = db.prepare('SELECT * FROM signals ORDER BY updated_at DESC LIMIT 1').all();
+          const signalCount = db.prepare('SELECT COUNT(*) as count FROM signals').get() as any;
+          const latestUpdate = signals.length > 0 ? (signals[0] as any).updated_at : '';
           
-          await new Promise(resolve => setTimeout(resolve, 50));
+          if (signalCount.count !== lastSignalCount || latestUpdate !== lastUpdateTime) {
+            lastSignalCount = signalCount.count;
+            lastUpdateTime = latestUpdate;
+            
+            const data = {
+              type: 'update',
+              timestamp: new Date().toISOString(),
+              signal_count: signalCount.count,
+              latest_update: latestUpdate
+            };
+            
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(data)}\n\n`)
+            );
+          } else {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: 'ping', timestamp: new Date().toISOString() })}\n\n`)
+            );
+          }
+        } catch (error) {
+          console.error('SSE error:', error);
         }
-      }
-
-      const intervalId = setInterval(() => {
-        sendEvent({
-          type: 'heartbeat',
-          timestamp: new Date().toISOString(),
-          data: { status: 'alive' },
-        });
-      }, 10000);
-
-      setTimeout(() => {
-        clearInterval(intervalId);
+      };
+      
+      const interval = setInterval(sendUpdate, 5000);
+      
+      sendUpdate();
+      
+      request.signal.addEventListener('abort', () => {
+        clearInterval(interval);
         controller.close();
-      }, 60000);
-    },
+      });
+    }
   });
-
+  
   return new Response(stream, {
     headers: {
       'Content-Type': 'text/event-stream',

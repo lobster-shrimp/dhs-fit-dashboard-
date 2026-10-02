@@ -1,76 +1,53 @@
-import { initializeSchema, insertCatalogSKU, insertSignal, getDb, closeDb } from '../lib/db';
-import { seedCatalog, seedSignals } from '../lib/seed';
-import { calculateFitScore } from '../lib/scoring';
-import { insertFitScore } from '../lib/db';
-import fs from 'fs';
-import path from 'path';
+import { seedDatabase } from '../lib/seed';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_PATH = path.join(DATA_DIR, 'intel.db');
+console.log('Initializing database...');
 
-console.log('🚀 Initializing DHS Fit Dashboard database...\n');
-
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  console.log('✅ Created data directory');
-}
-
-if (fs.existsSync(DB_PATH)) {
-  console.log('⚠️  Removing existing database...');
-  fs.unlinkSync(DB_PATH);
-}
-
-console.log('📊 Creating schema...');
-initializeSchema();
-console.log('✅ Schema created\n');
-
-console.log('📦 Seeding catalog...');
-for (const sku of seedCatalog) {
-  insertCatalogSKU(sku);
-  console.log(`  ✓ ${sku.name}`);
-}
-console.log(`✅ Seeded ${seedCatalog.length} catalog SKUs\n`);
-
-console.log('📡 Seeding signals...');
-for (const signal of seedSignals) {
-  insertSignal(signal);
-  console.log(`  ✓ ${signal.title}`);
-}
-console.log(`✅ Seeded ${seedSignals.length} signal(s)\n`);
-
-console.log('🎯 Calculating fit scores...');
-for (const signal of seedSignals) {
-  let scoreCount = 0;
-  for (const sku of seedCatalog) {
-    const { score, details } = calculateFitScore(signal, sku);
-    insertFitScore({
-      signal_id: signal.id,
-      sku_id: sku.id,
-      score,
-      match_details: details,
-      calculated_at: new Date().toISOString(),
+try {
+  const result = seedDatabase();
+  console.log('✓ Database initialized successfully');
+  console.log(`✓ Seeded signal ID: ${result.signalId}`);
+  
+  import('../lib/scoring').then(async ({ scoreProductsAgainstSignal }) => {
+    const db = (await import('../lib/db')).default;
+    
+    const signal = db.prepare('SELECT * FROM signals WHERE id = ?').get(result.signalId) as any;
+    const catalog = db.prepare('SELECT * FROM catalog').all() as any[];
+    
+    console.log('\nScoring ICE RFI against catalog...');
+    const scores = scoreProductsAgainstSignal(signal.full_text, catalog);
+    
+    const insertStmt = db.prepare(`
+      INSERT INTO fit_scores (signal_id, sku, product_name, fit_score, rationale)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    
+    for (const score of scores) {
+      insertStmt.run(
+        result.signalId,
+        score.sku,
+        score.product_name,
+        score.fit_score,
+        score.rationale
+      );
+    }
+    
+    const topScore = scores[0];
+    db.prepare(`
+      UPDATE signals 
+      SET top_sku = ?, fit_score = ?
+      WHERE id = ?
+    `).run(topScore.sku, topScore.fit_score, result.signalId);
+    
+    console.log(`✓ Scored ${scores.length} products`);
+    console.log(`✓ Top match: ${topScore.sku} (${topScore.fit_score}/100)`);
+    console.log('\nTop 5 scores:');
+    scores.slice(0, 5).forEach((score, idx) => {
+      console.log(`  ${idx + 1}. ${score.sku}: ${score.fit_score}/100 - ${score.product_name}`);
     });
-    scoreCount++;
-  }
-  console.log(`  ✓ ${signal.id}: ${scoreCount} scores calculated`);
+    
+    process.exit(0);
+  });
+} catch (error) {
+  console.error('Error:', error);
+  process.exit(1);
 }
-console.log('✅ Fit scores calculated\n');
-
-closeDb();
-
-console.log('🎉 Database initialization complete!');
-console.log(`📍 Location: ${DB_PATH}\n`);
-
-const db = getDb();
-const stats = {
-  catalog: db.prepare('SELECT COUNT(*) as count FROM catalog').get() as { count: number },
-  signals: db.prepare('SELECT COUNT(*) as count FROM signals').get() as { count: number },
-  scores: db.prepare('SELECT COUNT(*) as count FROM fit_scores').get() as { count: number },
-};
-closeDb();
-
-console.log('📈 Database statistics:');
-console.log(`   Catalog SKUs: ${stats.catalog.count}`);
-console.log(`   Signals: ${stats.signals.count}`);
-console.log(`   Fit Scores: ${stats.scores.count}`);
-console.log('\n✨ Ready to run: npm run dev');
